@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operaciones combinadas</title>
+<meta name="description" content="Operaciones combinadas paso a paso, respetando la jerarquía: en cada paso se hace lo que tiene prioridad y lo demás no se toca.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%232d3431'/%3E%3Crect x='14' y='18' width='36' height='22' rx='3' fill='none' stroke='%23f1e27c' stroke-width='4'/%3E%3Cpath d='M32 42v10m-5-5 5 5 5-5' fill='none' stroke='%23f1e27c' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "Andika"; font-weight: 400; font-style: normal; font-display: swap; src: url(data:font/woff2;base64,/*FUENTE400*/) format("woff2"); }
+@font-face { font-family: "Andika"; font-weight: 700; font-style: normal; font-display: swap; src: url(data:font/woff2;base64,/*FUENTE700*/) format("woff2"); }
+
+:root {
+  --pared: #e4e2dc;
+  --pared-tinta: #27302d;
+  --pared-suave: #5c6662;
+  --marco: #c4c9cc;
+  --marco-oscuro: #8f969a;
+  --pizarra: #2d3431;
+  --tiza: #eeede6;
+  --tiza-suave: rgba(238, 237, 230, .38);
+  --error: #a3362b;
+  --t1: #f1e27c;  /* amarillo */
+  --t2: #f2928a;  /* rojo */
+  --t3: #9fcbef;  /* azul */
+  --t4: #b1df98;  /* verde */
+  --t5: #f4b979;  /* naranja */
+  --t6: #cdb2f2;  /* lila */
+  --radio: 6px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--pared);
+  color: var(--pared-tinta);
+  font-family: "Andika", system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid #2f6fb3; outline-offset: 2px; }
+
+.pagina { max-width: 1180px; margin: 0 auto; padding: 22px 16px 40px; }
+
+/* ---------- Cabecera en la pared ---------- */
+.cabecera { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; margin-bottom: 14px; }
+h1 { font-size: 1.75rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
+.lema { margin: 0; color: var(--pared-suave); font-size: 1rem; max-width: 62ch; }
+
+/* ---------- Entrada ---------- */
+.entrada { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.campo {
+  width: 100%; min-width: 0;
+  font-size: 1.6rem; padding: 8px 14px;
+  background: #fbfaf7; border: 2px solid var(--marco-oscuro); border-radius: var(--radio);
+}
+.campo[aria-invalid="true"] { border-color: var(--error); }
+.boton {
+  border: 2px solid var(--pared-tinta); background: var(--pared-tinta); color: #fbfaf7;
+  border-radius: var(--radio); padding: 8px 18px; font-weight: 700; cursor: pointer;
+}
+.boton:hover { background: #3b4743; }
+.boton.claro { background: transparent; color: var(--pared-tinta); }
+.boton.claro:hover { background: rgba(39, 48, 45, .08); }
+.boton:disabled { opacity: .35; cursor: default; }
+.mensaje { min-height: 1.45em; margin: 6px 2px 0; color: var(--error); font-weight: 700; }
+
+.extras { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 4px; }
+.extras .etiqueta { color: var(--pared-suave); }
+.ejemplo {
+  background: transparent; border: 1.5px solid var(--marco-oscuro); border-radius: 999px;
+  padding: 2px 12px; cursor: pointer; font-size: .95rem;
+}
+.ejemplo:hover { border-color: var(--pared-tinta); }
+.ejemplo small { color: var(--pared-suave); }
+.conmutador { margin-left: auto; }
+
+.teclado {
+  display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px;
+  margin-top: 10px; max-width: 640px;
+}
+.teclado[hidden] { display: none; }
+.tecla {
+  min-height: 48px; font-size: 1.35rem; font-weight: 700;
+  background: #fbfaf7; border: 1.5px solid var(--marco-oscuro); border-radius: var(--radio); cursor: pointer;
+}
+.tecla:hover { background: #fff; }
+.tecla.ancha { grid-column: span 2; font-size: 1rem; }
+.tecla svg { width: 1.4em; height: 1.4em; vertical-align: middle; }
+
+/* ---------- Pizarra ---------- */
+.pizarra {
+  position: relative; margin-top: 16px;
+  background:
+    radial-gradient(120% 70% at 30% 40%, rgba(255,255,255,.045), transparent 60%),
+    radial-gradient(90% 60% at 80% 75%, rgba(255,255,255,.03), transparent 65%),
+    var(--pizarra);
+  color: var(--tiza);
+  border: 12px solid var(--marco);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 2px var(--marco-oscuro), 0 2px 0 var(--marco-oscuro);
+  padding: 18px 22px 16px;
+  min-height: 300px;
+}
+.jerarquia { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 26px; font-size: 1rem; }
+.jerarquia li { color: var(--tiza-suave); transition: color .25s; }
+.jerarquia li.activa { color: var(--tiza); }
+.jerarquia li.activa::after {
+  content: ""; display: block; height: 3px; border-radius: 2px; margin-top: 1px; background: var(--c, var(--tiza));
+}
+
+.desplazable { overflow-x: auto; overflow-y: hidden; padding: 14px 0 4px; }
+.lienzo { position: relative; width: max-content; min-width: 100%; font-size: var(--tam, 2.4rem); }
+.flechas { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.flechas path { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.flechas path.on { opacity: .95; }
+.flechas path.dibujar { transition: stroke-dashoffset .55s ease-out; }
+
+.linea { display: grid; grid-template-columns: 1.1em auto; align-items: baseline; line-height: 1.25; margin-bottom: 1.15em; white-space: nowrap; }
+.linea:last-child { margin-bottom: .2em; }
+.linea.oculta { visibility: hidden; }
+.linea .igual { color: var(--tiza); }
+.n { font-variant-numeric: lining-nums; }
+.o { display: inline-block; }
+.o.suma { margin: 0 .3em; }
+.o.mul { margin: 0 .14em; font-weight: 700; }
+.g { display: inline-block; margin: 0 .03em; }
+.caja {
+  display: inline-block; padding: 0 .12em; margin: 0 .05em;
+  border: .075em solid transparent; border-radius: .14em;
+  transition: border-color .2s;
+}
+.caja.on { border-color: var(--c); }
+.res { color: var(--c); font-weight: 700; }
+.linea.final .res { color: var(--tiza); }
+
+.leyenda {
+  display: flex; gap: 12px; align-items: flex-start;
+  margin: 8px 0 4px; padding-bottom: 12px; border-bottom: 1px dashed rgba(238,237,230,.22);
+  min-height: 3.6em; font-size: 1.15rem;
+}
+.leyenda .chip { flex: none; width: 14px; height: 14px; border-radius: 50%; margin-top: .35em; background: var(--c, transparent); }
+.leyenda .num-paso { font-weight: 700; margin-right: .35em; }
+.leyenda .final-txt { font-weight: 700; font-size: 1.3rem; }
+
+/* ---------- Bandeja de la pizarra ---------- */
+.bandeja { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.bandeja .progreso { color: var(--pared-suave); margin-right: auto; }
+.bandeja .boton.grande { font-size: 1.15rem; padding: 10px 26px; }
+
+.vacio { color: var(--tiza-suave); font-size: 1.25rem; padding: 40px 0; text-align: center; }
+
+.pie { margin-top: 26px; color: var(--pared-suave); font-size: .9rem; }
+.pie kbd { font-family: inherit; border: 1px solid var(--marco-oscuro); border-radius: 4px; padding: 0 5px; background: #f3f2ee; }
+
+@media (max-width: 640px) {
+  body { font-size: 17px; }
+  h1 { font-size: 1.45rem; }
+  .campo { font-size: 1.35rem; }
+  .pizarra { border-width: 8px; padding: 12px 12px 12px; }
+  .teclado { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tecla.ancha { grid-column: span 1; }
+  .conmutador { margin-left: 0; }
+  .bandeja .progreso { width: 100%; }
+  .bandeja .boton.grande { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flechas path.dibujar, .caja, .jerarquia li { transition: none; }
+}
+@media print {
+  body { background: #fff; }
+  .entrada, .extras, .teclado, .bandeja, .mensaje, .pie { display: none !important; }
+  .pizarra { background: #fff; color: #000; border: 1px solid #999; box-shadow: none; }
+  .linea .igual, .linea.final .res { color: #000; }
+  .jerarquia li { color: #888; }
+  .jerarquia li.activa { color: #000; }
+}
+</style>
+</head>
+<body>
+<main class="pagina">
+  <header class="cabecera">
+    <h1>Operaciones combinadas</h1>
+    <p class="lema">En cada paso se hace la operación u operaciones que tienen prioridad, y las demás no se tocan.</p>
+  </header>
+
+  <form class="entrada" id="formulario" autocomplete="off">
+    <label class="visual-oculto" for="campo" style="position:absolute;left:-9999px">Operación</label>
+    <input class="campo" id="campo" type="text" spellcheck="false" autocapitalize="off" inputmode="text"
+           placeholder="Escribe la operación, por ejemplo 3 · (12 − 7) − [15 − 2 · (7 − 4)]" aria-describedby="mensaje">
+    <button class="boton" type="submit">Resolver</button>
+  </form>
+  <p class="mensaje" id="mensaje" role="alert"></p>
+
+  <div class="extras">
+    <span class="etiqueta">Ejemplos:</span>
+    <span id="ejemplos" style="display:contents"></span>
+    <button class="boton claro conmutador" type="button" id="verTeclado" aria-expanded="false" aria-controls="teclado">Teclado en pantalla</button>
+  </div>
+  <div class="teclado" id="teclado" hidden></div>
+
+  <section class="pizarra" aria-label="Pizarra">
+    <ol class="jerarquia" id="jerarquia">
+      <li data-nivel="grupo">1.º Paréntesis y corchetes</li>
+      <li data-nivel="mul">2.º Multiplicaciones y divisiones</li>
+      <li data-nivel="suma">3.º Sumas y restas</li>
+    </ol>
+    <div class="leyenda" id="leyenda" aria-live="polite"></div>
+    <div class="desplazable" id="desplazable">
+      <div class="lienzo" id="lienzo"></div>
+    </div>
+  </section>
+
+  <div class="bandeja">
+    <span class="progreso" id="progreso"></span>
+    <button class="boton claro" type="button" id="bInicio">Desde el principio</button>
+    <button class="boton claro" type="button" id="bAnterior">Anterior</button>
+    <button class="boton grande" type="button" id="bSiguiente">Siguiente</button>
+    <button class="boton claro" type="button" id="bTodo">Ver todo</button>
+  </div>
+
+  <p class="pie">Para multiplicar se puede escribir <kbd>·</kbd>, <kbd>*</kbd> o <kbd>x</kbd>; para dividir, <kbd>:</kbd> o <kbd>/</kbd>.
+    Con el teclado: <kbd>→</kbd> o <kbd>Espacio</kbd> avanza y <kbd>←</kbd> retrocede.
+    Esta versión trabaja con números naturales, paréntesis y corchetes.</p>
+</main>
+
+<script>
+/*MOTOR*/
+</script>
+<script>
+(() => {
+  'use strict';
+  const COLORES = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)', 'var(--t6)'];
+  const colorPaso = i => COLORES[i % COLORES.length];
+  const EJEMPLOS = [
+    { op: '3 · (12 − 7) − [15 − 2 · (7 − 4)]' },
+    { op: '40 − [5 · 4 − 3 · (2 + 3) + 5] · 3' },
+    { op: '(2 + 3 · 4) − (9 − 5)' },
+    { op: '24 : 4 · 2 + 18 : (7 − 4)' },
+    { op: '[30 − 2 · (8 + 4)] · 5 + 6' },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const campo = $('campo'), mensaje = $('mensaje'), lienzo = $('lienzo'), desplazable = $('desplazable');
+  const leyenda = $('leyenda'), progreso = $('progreso'), jerarquia = $('jerarquia');
+  const bInicio = $('bInicio'), bAnterior = $('bAnterior'), bSiguiente = $('bSiguiente'), bTodo = $('bTodo');
+
+  let sol = null;      // resultado del motor
+  let fase = 0;        // 0 … 2·nPasos
+  let svg = null;
+
+  /* ---------- Normalizar signos mientras se escribe ---------- */
+  function normalizarCampo() {
+    const antes = campo.value, pos = campo.selectionStart;
+    const despues = antes.replace(/[*xX×⋅]/g, '·').replace(/[/÷]/g, ':').replace(/[-–—]/g, '−');
+    if (despues !== antes) { campo.value = despues; campo.setSelectionRange(pos, pos); }
+  }
+  campo.addEventListener('input', () => { normalizarCampo(); campo.removeAttribute('aria-invalid'); mensaje.textContent = ''; });
+
+  /* ---------- Teclado en pantalla ---------- */
+  const TECLAS = ['1','2','3','4','5','6','7','8','9','0','+','−','·',':','(',')','[',']','borrar','limpiar'];
+  const teclado = $('teclado');
+  for (const t of TECLAS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tecla';
+    if (t === 'borrar') {
+      b.setAttribute('aria-label', 'Borrar');
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 5h11v14H9l-6-7z"/><path d="M12.5 9.5l5 5m0-5l-5 5"/></svg>';
+    } else if (t === 'limpiar') {
+      b.textContent = 'Vaciar'; b.style.fontSize = '1rem';
+    } else b.textContent = t;
+    b.addEventListener('click', () => pulsar(t));
+    teclado.appendChild(b);
+  }
+  function pulsar(t) {
+    const ini = campo.selectionStart ?? campo.value.length, fin = campo.selectionEnd ?? ini;
+    const v = campo.value;
+    if (t === 'limpiar') { campo.value = ''; ponerCursor(0); }
+    else if (t === 'borrar') {
+      if (ini !== fin) { campo.value = v.slice(0, ini) + v.slice(fin); ponerCursor(ini); }
+      else if (ini > 0) { campo.value = v.slice(0, ini - 1) + v.slice(ini); ponerCursor(ini - 1); }
+    } else {
+      const txt = /[0-9]/.test(t) || t === '(' || t === ')' || t === '[' || t === ']' ? t : ' ' + t + ' ';
+      campo.value = v.slice(0, ini) + txt + v.slice(fin); ponerCursor(ini + txt.length);
+    }
+    campo.removeAttribute('aria-invalid'); mensaje.textContent = '';
+  }
+  function ponerCursor(p) {
+    // En pantallas táctiles no enfocamos para que no salga el teclado del sistema
+    const tactil = matchMedia('(pointer: coarse)').matches;
+    if (!tactil) campo.focus();
+    try { campo.setSelectionRange(p, p); } catch (e) {}
+  }
+  const verTeclado = $('verTeclado');
+  function mostrarTeclado(si) {
+    teclado.hidden = !si; verTeclado.setAttribute('aria-expanded', String(si));
+    verTeclado.textContent = si ? 'Ocultar teclado' : 'Teclado en pantalla';
+  }
+  verTeclado.addEventListener('click', () => mostrarTeclado(teclado.hidden));
+  mostrarTeclado(matchMedia('(pointer: coarse)').matches);
+
+  /* ---------- Ejemplos ---------- */
+  const zonaEj = $('ejemplos');
+  for (const ej of EJEMPLOS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ejemplo'; b.textContent = ej.op;
+    b.addEventListener('click', () => { campo.value = ej.op; resolver(true); });
+    zonaEj.appendChild(b);
+  }
+
+  /* ---------- Dibujo de una línea ---------- */
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  function opHTML(o) {
+    const clase = (o === '+' || o === '−') ? 'suma' : 'mul';
+    return `<span class="o ${clase}">${o}</span>`;
+  }
+  function envolver(nodo, html) {
+    if (!nodo.caja) return html;
+    const paso = +nodo.caja.split('-')[0];
+    return `<span class="caja" data-op="${nodo.caja}" data-paso="${paso}" style="--c:${colorPaso(paso)}">${html}</span>`;
+  }
+  function html(n) {
+    switch (n.t) {
+      case 'num': {
+        if (n.res) {
+          const paso = +n.res.split('-')[0];
+          return `<span class="n res" data-res="${n.res}" style="--c:${colorPaso(paso)}">${n.v}</span>`;
+        }
+        return `<span class="n">${n.v}</span>`;
+      }
+      case 'grp':
+        return envolver(n, `<span class="g">${n.k}</span>${html(n.e)}<span class="g">${Motor.CIERRE[n.k]}</span>`);
+      case 'term':
+        return envolver(n, n.fs.map((f, i) => (i ? opHTML(n.ops[i - 1]) : '') + html(f)).join(''));
+      case 'expr':
+        return envolver(n, n.terms.map((t, i) => (i ? opHTML(n.ops[i - 1]) : '') + html(t)).join(''));
+    }
+  }
+
+  function pintar(textoVacio) {
+    lienzo.innerHTML = '';
+    if (!sol) {
+      lienzo.innerHTML = `<p class="vacio">${textoVacio || 'Escribe una operación o elige un ejemplo.'}</p>`;
+      return;
+    }
+    const partes = sol.lineas.map((l, i) =>
+      `<div class="linea${i === sol.lineas.length - 1 ? ' final' : ''}" data-i="${i}"><span class="igual">${i ? '=' : ''}</span><span class="expr">${html(l)}</span></div>`);
+    lienzo.innerHTML = partes.join('');
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'flechas'); svg.setAttribute('aria-hidden', 'true');
+    lienzo.prepend(svg);
+    ajustarTam();
+  }
+
+  /* Reduce la letra si la línea más larga no cabe */
+  function ajustarTam() {
+    if (!sol) return;
+    const base = innerWidth <= 640 ? 1.9 : 2.4;  // rem
+    lienzo.style.setProperty('--tam', base + 'rem');
+    const disp = desplazable.clientWidth - 4;
+    const ancho = Math.max(...[...lienzo.querySelectorAll('.linea')].map(l => l.scrollWidth));
+    if (ancho > disp) {
+      const f = Math.max(0.55, disp / ancho);
+      lienzo.style.setProperty('--tam', (base * f).toFixed(3) + 'rem');
+    }
+    dibujarFlechas();
+    aplicarFase(false);
+  }
+
+  function dibujarFlechas() {
+    if (!svg) return;
+    svg.innerHTML = '';
+    const r0 = lienzo.getBoundingClientRect();
+    const em = parseFloat(getComputedStyle(lienzo).fontSize);
+    for (const caja of lienzo.querySelectorAll('.caja')) {
+      const id = caja.dataset.op;
+      const dest = lienzo.querySelector(`.res[data-res="${id}"]`);
+      if (!dest) continue;
+      const a = caja.getBoundingClientRect(), b = dest.getBoundingClientRect();
+      const x1 = a.left + a.width / 2 - r0.left, y1 = a.bottom - r0.top + em * 0.06;
+      const x2 = b.left + b.width / 2 - r0.left, y2 = b.top - r0.top + em * 0.02;
+      const dy = y2 - y1, h = em * 0.3;
+      const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} C${x1.toFixed(1)} ${(y1 + dy * .6).toFixed(1)} ${x2.toFixed(1)} ${(y2 - dy * .6).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}` +
+                ` M${(x2 - h * .65).toFixed(1)} ${(y2 - h).toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} L${(x2 + h * .65).toFixed(1)} ${(y2 - h).toFixed(1)}`;
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('stroke', cssColor(caja));
+      p.dataset.paso = caja.dataset.paso;
+      p.style.strokeWidth = Math.max(2.2, em * 0.08).toFixed(2);
+      svg.appendChild(p);
+      const L = p.getTotalLength();
+      p.style.strokeDasharray = L; p.style.strokeDashoffset = 0; p.dataset.l = L;
+    }
+  }
+  // Resuelve var(--tN) a un color concreto para el atributo stroke
+  function cssColor(el) {
+    const v = getComputedStyle(el).getPropertyValue('--c').trim();
+    const m = v.match(/var\((--[a-z0-9]+)\)/);
+    return m ? getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() : v;
+  }
+
+  /* ---------- Fases ----------
+     fase impar 2i+1: se recuadra lo que tiene prioridad en el paso i
+     fase par 2i+2: flecha y resultado del paso i en la línea siguiente   */
+  function totalFases() { return sol ? sol.pasos.length * 2 : 0; }
+
+  function aplicarFase(animar) {
+    if (!sol) { actualizarControles(); return; }
+    const visibles = 1 + Math.floor(fase / 2);
+    lienzo.querySelectorAll('.linea').forEach((l, i) => l.classList.toggle('oculta', i >= visibles));
+    const cajasHasta = Math.ceil(fase / 2);      // pasos con recuadro
+    const flechasHasta = Math.floor(fase / 2);   // pasos con flecha
+    lienzo.querySelectorAll('.caja').forEach(c => c.classList.toggle('on', +c.dataset.paso < cajasHasta));
+    const reducir = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    svg && svg.querySelectorAll('path').forEach(p => {
+      const on = +p.dataset.paso < flechasHasta;
+      const nueva = on && !p.classList.contains('on');
+      p.classList.toggle('on', on);
+      if (nueva && animar && !reducir) {
+        p.classList.remove('dibujar');
+        p.style.strokeDashoffset = p.dataset.l;
+        p.getBoundingClientRect();
+        p.classList.add('dibujar');
+        p.style.strokeDashoffset = 0;
+      } else if (!nueva) { p.classList.remove('dibujar'); p.style.strokeDashoffset = 0; }
+    });
+
+    // Jerarquía y leyenda
+    const iPaso = fase === 0 ? -1 : Math.ceil(fase / 2) - 1;
+    const pasoAct = iPaso >= 0 && fase < totalFases() ? sol.pasos[iPaso] : null;
+    // Dentro de un paréntesis o corchete se marcan dos niveles: dónde estamos y qué operación se hace
+    const niveles = pasoAct ? (pasoAct.ambito === 'grupo' ? ['grupo', pasoAct.nivel] : [pasoAct.nivel]) : [];
+    jerarquia.querySelectorAll('li').forEach(li => {
+      const act = niveles.includes(li.dataset.nivel);
+      li.classList.toggle('activa', act);
+      li.style.setProperty('--c', act ? colorPaso(iPaso) : '');
+    });
+
+    const n = sol.pasos.length;
+    if (fase === 0) {
+      leyenda.innerHTML = `<span class="chip"></span><span>Pulsa <b>Siguiente</b> para marcar lo que tiene prioridad.</span>`;
+    } else if (fase === totalFases()) {
+      leyenda.innerHTML = `<span class="chip" style="--c:var(--tiza)"></span><span class="final-txt">Resultado: ${sol.resultado}</span>`;
+    } else {
+      const p = sol.pasos[iPaso];
+      const extra = fase % 2 === 1 ? '' : ' <span style="opacity:.75">Se escribe el resultado y se copia lo demás.</span>';
+      leyenda.innerHTML = `<span class="chip" style="--c:${colorPaso(iPaso)}"></span><span><span class="num-paso">Paso ${iPaso + 1}.</span>${esc(p.texto)}${extra}</span>`;
+    }
+    actualizarControles();
+  }
+
+  function actualizarControles() {
+    const t = totalFases();
+    bAnterior.disabled = !sol || fase === 0;
+    bInicio.disabled = !sol || fase === 0;
+    bSiguiente.disabled = !sol || fase >= t;
+    bTodo.disabled = !sol || fase >= t;
+    if (!sol) { progreso.textContent = ''; return; }
+    const n = sol.pasos.length;
+    progreso.textContent = fase === t ? `${n} ${n === 1 ? 'paso' : 'pasos'}: terminado`
+                         : fase === 0 ? `${n} ${n === 1 ? 'paso' : 'pasos'}`
+                         : `Paso ${Math.ceil(fase / 2)} de ${n}`;
+  }
+
+  function ir(f, animar) { fase = Math.max(0, Math.min(totalFases(), f)); aplicarFase(animar); }
+  bSiguiente.addEventListener('click', () => ir(fase + 1, true));
+  bAnterior.addEventListener('click', () => ir(fase - 1, false));
+  bInicio.addEventListener('click', () => ir(0, false));
+  bTodo.addEventListener('click', () => ir(totalFases(), false));
+
+  document.addEventListener('keydown', e => {
+    if (!sol || e.target === campo || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); ir(fase + 1, true); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); ir(fase - 1, false); }
+    else if (e.key === 'Home') { e.preventDefault(); ir(0, false); }
+    else if (e.key === 'End') { e.preventDefault(); ir(totalFases(), false); }
+  });
+
+  /* ---------- Resolver ---------- */
+  function resolver(desdeEjemplo) {
+    normalizarCampo();
+    const src = campo.value;
+    try {
+      sol = Motor.resolver(src);
+      mensaje.textContent = '';
+      campo.removeAttribute('aria-invalid');
+      fase = 0;
+      pintar();
+      const url = new URL(location.href);
+      url.searchParams.set('op', src.trim());
+      history.replaceState(null, '', url);
+      if (desdeEjemplo !== 'url') bSiguiente.focus({ preventScroll: true });
+    } catch (e) {
+      if (!(e instanceof Motor.ErrorMates)) { console.error(e); mensaje.textContent = 'Algo ha fallado al resolver esta operación.'; return; }
+      sol = null; pintar('Corrige la operación y pulsa «Resolver».'); aplicarFase(false);
+      mensaje.textContent = e.message;
+      campo.setAttribute('aria-invalid', 'true');
+      if (typeof e.pos === 'number') { campo.focus(); try { campo.setSelectionRange(e.pos, e.pos + 1); } catch (_) {} }
+      leyenda.innerHTML = '';
+    }
+  }
+  $('formulario').addEventListener('submit', e => { e.preventDefault(); resolver(false); });
+
+  let tResize;
+  addEventListener('resize', () => { clearTimeout(tResize); tResize = setTimeout(ajustarTam, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => sol && ajustarTam());
+
+  // Inicio: operación de la URL o el primer ejemplo
+  const inicial = new URL(location.href).searchParams.get('op');
+  campo.value = inicial || EJEMPLOS[0].op;
+  resolver('url');
+})();
+</script>
+</body>
+</html>
