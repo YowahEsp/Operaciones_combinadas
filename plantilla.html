@@ -113,11 +113,15 @@ h1 { font-size: 1.75rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
 .desplazable { overflow-x: auto; overflow-y: hidden; padding: 14px 0 4px; }
 .lienzo { position: relative; width: max-content; min-width: 100%; font-size: var(--tam, 2.4rem); }
 .flechas { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.flechas path { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
-.flechas path.on { opacity: .95; }
-.flechas path.dibujar { transition: stroke-dashoffset .55s ease-out; }
+.flecha { opacity: 0; }
+.flecha.on { opacity: 1; }
+.flecha .trazo { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.flecha .punta { stroke: none; }
+.flecha.dibujar .trazo { transition: stroke-dashoffset .45s ease-in-out; }
+.flecha.dibujar .punta { animation: aparecer .12s linear .4s both; }
+@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
 
-.linea { display: grid; grid-template-columns: 1.1em auto; align-items: baseline; line-height: 1.25; margin-bottom: 1.15em; white-space: nowrap; }
+.linea { display: grid; grid-template-columns: 1.1em auto; align-items: baseline; line-height: 1.25; margin-bottom: 1.35em; white-space: nowrap; }
 .linea:last-child { margin-bottom: .2em; }
 .linea.oculta { visibility: hidden; }
 .linea .igual { color: var(--tiza); }
@@ -166,7 +170,8 @@ h1 { font-size: 1.75rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
   .bandeja .boton.grande { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .flechas path.dibujar, .caja, .jerarquia li { transition: none; }
+  .flecha.dibujar .trazo, .caja, .jerarquia li { transition: none; }
+  .flecha.dibujar .punta { animation: none; }
 }
 @media print {
   body { background: #fff; }
@@ -368,29 +373,131 @@ h1 { font-size: 1.75rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
     aplicarFase(false);
   }
 
+  /* ---------- Flechas ----------
+     Como en la pizarra: bajan del recuadro, corren en horizontal por el hueco
+     entre renglones y bajan hasta el resultado. Esquinas redondeadas, punta
+     maciza y, si en un paso hay varias, cada una por su carril sin cruzarse. */
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const medidor = document.createElement('canvas').getContext('2d');
+  // Distancia desde el borde superior de la caja de un texto hasta lo alto de sus cifras
+  function sobreCifras(el) {
+    const cs = getComputedStyle(el);
+    medidor.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const m = medidor.measureText('0123456789');
+    if (!m.fontBoundingBoxAscent) return parseFloat(cs.fontSize) * 0.25;
+    return m.fontBoundingBoxAscent - m.actualBoundingBoxAscent;
+  }
+  const f1 = n => n.toFixed(1);
+
   function dibujarFlechas() {
     if (!svg) return;
     svg.innerHTML = '';
     const r0 = lienzo.getBoundingClientRect();
     const em = parseFloat(getComputedStyle(lienzo).fontSize);
+    const grosor = Math.max(2.4, em * 0.07);
+    const largoPunta = grosor * 4.4, anchoPunta = grosor * 3.8;
+    const radio = em * 0.2;
+
+    // 1.ª pasada (solo posiciones horizontales): flechas por paso y carriles
+    const porPaso = new Map();
     for (const caja of lienzo.querySelectorAll('.caja')) {
-      const id = caja.dataset.op;
-      const dest = lienzo.querySelector(`.res[data-res="${id}"]`);
+      const dest = lienzo.querySelector(`.res[data-res="${caja.dataset.op}"]`);
       if (!dest) continue;
       const a = caja.getBoundingClientRect(), b = dest.getBoundingClientRect();
-      const x1 = a.left + a.width / 2 - r0.left, y1 = a.bottom - r0.top + em * 0.06;
-      const x2 = b.left + b.width / 2 - r0.left, y2 = b.top - r0.top + em * 0.02;
-      const dy = y2 - y1, h = em * 0.3;
-      const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} C${x1.toFixed(1)} ${(y1 + dy * .6).toFixed(1)} ${x2.toFixed(1)} ${(y2 - dy * .6).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}` +
-                ` M${(x2 - h * .65).toFixed(1)} ${(y2 - h).toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} L${(x2 + h * .65).toFixed(1)} ${(y2 - h).toFixed(1)}`;
-      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      p.setAttribute('d', d);
-      p.setAttribute('stroke', cssColor(caja));
-      p.dataset.paso = caja.dataset.paso;
-      p.style.strokeWidth = Math.max(2.2, em * 0.08).toFixed(2);
-      svg.appendChild(p);
-      const L = p.getTotalLength();
-      p.style.strokeDasharray = L; p.style.strokeDashoffset = 0; p.dataset.l = L;
+      const fl = {
+        caja, dest, paso: +caja.dataset.paso,
+        x1: a.left + a.width / 2 - r0.left,
+        x2: b.left + b.width / 2 - r0.left,
+      };
+      fl.dx = fl.x2 - fl.x1;
+      // Si el resultado cae debajo del recuadro, la flecha baja recta
+      const margen = Math.max(radio, em * 0.3);
+      fl.recta = fl.x2 >= a.left - r0.left + margen && fl.x2 <= a.right - r0.left - margen;
+      if (!porPaso.has(fl.paso)) porPaso.set(fl.paso, []);
+      porPaso.get(fl.paso).push(fl);
+    }
+    const lineas = lienzo.querySelectorAll('.linea');
+    lineas.forEach(l => { l.style.marginBottom = ''; });
+    for (const [paso, lista] of porPaso) {
+      // Carriles: las que van a la izquierda, de izquierda a derecha;
+      // las que van a la derecha, de derecha a izquierda. Así no se cruzan.
+      const izq = lista.filter(f => !f.recta && f.dx < 0).sort((p, q) => p.x1 - q.x1);
+      const der = lista.filter(f => !f.recta && f.dx > 0).sort((p, q) => q.x1 - p.x1);
+      const colocadas = [];
+      let carriles = 0;
+      for (const f of [...izq, ...der]) {
+        const lo = Math.min(f.x1, f.x2) - radio, hi = Math.max(f.x1, f.x2) + radio;
+        // Por debajo de todas las ya colocadas con las que se solapa: así nunca se cruzan
+        const c = colocadas.filter(o => o.lo < hi && lo < o.hi).reduce((m, o) => Math.max(m, o.carril + 1), 0);
+        f.carril = c; colocadas.push({ carril: c, lo, hi });
+        carriles = Math.max(carriles, c + 1);
+      }
+      lista.carriles = carriles;
+      // Con varios carriles, el renglón se separa un poco más para que respiren
+      if (carriles > 1 && lineas[paso])
+        lineas[paso].style.marginBottom = `${1.35 + 0.4 * (carriles - 1)}em`;
+    }
+
+    // 2.ª pasada (ya con la separación definitiva): alturas.
+    // Todas las puntas se detienen a la altura donde empezaría un recuadro,
+    // haya recuadro o no, para que queden a la misma distancia de las cifras.
+    let holgura = em * 0.06;
+    const muestra = lienzo.querySelector('.caja > .n');
+    if (muestra)
+      holgura = muestra.getBoundingClientRect().top + sobreCifras(muestra) - muestra.parentElement.getBoundingClientRect().top + em * 0.05;
+    for (const lista of porPaso.values()) {
+      for (const f of lista) {
+        const a = f.caja.getBoundingClientRect(), b = f.dest.getBoundingClientRect();
+        f.y1 = a.bottom - r0.top + em * 0.05;
+        f.y2 = b.top - r0.top + sobreCifras(f.dest) - holgura;
+        // Si el resultado queda dentro de un recuadro de un paso posterior,
+        // la punta se detiene justo encima de su borde en vez de pisarlo
+        for (let c = f.dest.parentElement.closest('.caja'); c && lienzo.contains(c); c = c.parentElement.closest('.caja'))
+          f.y2 = Math.min(f.y2, c.getBoundingClientRect().top - r0.top - em * 0.05);
+      }
+    }
+
+    for (const lista of porPaso.values()) {
+      const carriles = lista.carriles;
+      const arriba = Math.max(...lista.map(f => f.y1));
+      const abajo = Math.min(...lista.map(f => f.y2));
+      const yMin = arriba + radio + 1, yMax = abajo - largoPunta - radio - 1;
+      const yCarril = c => {
+        if (yMax <= yMin) return (arriba + abajo - largoPunta) / 2;
+        if (carriles <= 1) return yMin + (yMax - yMin) * 0.45;
+        return yMin + (yMax - yMin) * c / (carriles - 1);
+      };
+
+      for (const f of lista) {
+        const fin = f.y2 - largoPunta * 0.55;     // el trazo se mete bajo la punta
+        let d;
+        if (f.recta) {
+          d = `M${f1(f.x2)} ${f1(f.y1)} V${f1(fin)}`;
+        } else {
+          const y = yCarril(f.carril), s = Math.sign(f.dx);
+          const r = Math.max(0, Math.min(radio, Math.abs(f.dx) / 2, y - f.y1, fin - y));
+          d = `M${f1(f.x1)} ${f1(f.y1)} V${f1(y - r)}` +
+              ` Q${f1(f.x1)} ${f1(y)} ${f1(f.x1 + s * r)} ${f1(y)}` +
+              ` H${f1(f.x2 - s * r)}` +
+              ` Q${f1(f.x2)} ${f1(y)} ${f1(f.x2)} ${f1(y + r)}` +
+              ` V${f1(fin)}`;
+        }
+        const color = cssColor(f.caja);
+        const g = document.createElementNS(SVGNS, 'g');
+        g.setAttribute('class', 'flecha'); g.dataset.paso = f.paso;
+        const trazo = document.createElementNS(SVGNS, 'path');
+        trazo.setAttribute('class', 'trazo'); trazo.setAttribute('d', d);
+        trazo.setAttribute('stroke', color); trazo.style.strokeWidth = f1(grosor);
+        const xp = f.x2, yp = f.y2;
+        const punta = document.createElementNS(SVGNS, 'path');
+        punta.setAttribute('class', 'punta'); punta.setAttribute('fill', color);
+        punta.setAttribute('d', `M${f1(xp)} ${f1(yp)} L${f1(xp - anchoPunta / 2)} ${f1(yp - largoPunta)}` +
+          ` Q${f1(xp)} ${f1(yp - largoPunta * 0.72)} ${f1(xp + anchoPunta / 2)} ${f1(yp - largoPunta)} Z`);
+        g.append(trazo, punta);
+        svg.appendChild(g);
+        const L = trazo.getTotalLength();
+        trazo.style.strokeDasharray = `${L} ${L}`; trazo.style.strokeDashoffset = 0; g.dataset.l = L;
+      }
     }
   }
   // Resuelve var(--tN) a un color concreto para el atributo stroke
@@ -413,17 +520,18 @@ h1 { font-size: 1.75rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
     const flechasHasta = Math.floor(fase / 2);   // pasos con flecha
     lienzo.querySelectorAll('.caja').forEach(c => c.classList.toggle('on', +c.dataset.paso < cajasHasta));
     const reducir = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    svg && svg.querySelectorAll('path').forEach(p => {
-      const on = +p.dataset.paso < flechasHasta;
-      const nueva = on && !p.classList.contains('on');
-      p.classList.toggle('on', on);
+    svg && svg.querySelectorAll('.flecha').forEach(g => {
+      const on = +g.dataset.paso < flechasHasta;
+      const nueva = on && !g.classList.contains('on');
+      const trazo = g.querySelector('.trazo');
+      g.classList.toggle('on', on);
       if (nueva && animar && !reducir) {
-        p.classList.remove('dibujar');
-        p.style.strokeDashoffset = p.dataset.l;
-        p.getBoundingClientRect();
-        p.classList.add('dibujar');
-        p.style.strokeDashoffset = 0;
-      } else if (!nueva) { p.classList.remove('dibujar'); p.style.strokeDashoffset = 0; }
+        g.classList.remove('dibujar');
+        trazo.style.strokeDashoffset = g.dataset.l;
+        g.getBoundingClientRect();
+        g.classList.add('dibujar');
+        trazo.style.strokeDashoffset = 0;
+      } else if (!nueva) { g.classList.remove('dibujar'); trazo.style.strokeDashoffset = 0; }
     });
 
     // Jerarquía y leyenda
